@@ -35,27 +35,83 @@ var init = function () {
     ctx.fillStyle = "rgba(0,0,0,1)";
     ctx.fillRect(0, 0, width, height);
 
+    // Добавляем отслеживание позиции мыши и волны
+    var mouseX = width / 2;
+    var mouseY = height / 2;
+    var mouseRadius = 150;
+    var waves = [];
+    var lastMouseX = mouseX;
+    var lastMouseY = mouseY;
+
+    canvas.addEventListener('mousemove', function(e) {
+        var dx = e.clientX - lastMouseX;
+        var dy = e.clientY - lastMouseY;
+        var speed = Math.sqrt(dx * dx + dy * dy);
+        
+        if (speed > 5) {
+            waves.push({
+                x: e.clientX,
+                y: e.clientY,
+                radius: 1,
+                maxRadius: mouseRadius * 2,
+                speed: 5,
+                life: 1,
+                color: `hsla(${Math.random() * 360}, 100%, 50%, 0.3)`
+            });
+        }
+        
+        lastMouseX = mouseX = e.clientX;
+        lastMouseY = mouseY = e.clientY;
+    });
+
+    canvas.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+        var touch = e.touches[0];
+        var dx = touch.clientX - lastMouseX;
+        var dy = touch.clientY - lastMouseY;
+        var speed = Math.sqrt(dx * dx + dy * dy);
+        
+        if (speed > 5) {
+            waves.push({
+                x: touch.clientX,
+                y: touch.clientY,
+                radius: 1,
+                maxRadius: mouseRadius * 2,
+                speed: 5,
+                life: 1,
+                color: `hsla(${Math.random() * 360}, 100%, 50%, 0.3)`
+            });
+        }
+        
+        lastMouseX = mouseX = touch.clientX;
+        lastMouseY = mouseY = touch.clientY;
+    });
+
     // Добавляем текст "RGB yuliitezary" через JavaScript
     var title = document.createElement('div');
     title.innerHTML = "RGB yuliitezary";
     title.style.position = 'absolute';
-    title.style.top = '10px';
+    title.style.top = '20px';
     title.style.width = '100%';
     title.style.textAlign = 'center';
-    title.style.fontSize = '24px';
+    title.style.fontSize = '32px';
     title.style.fontFamily = 'Arial, sans-serif';
     title.style.zIndex = '10';
-    document.body.appendChild(title); // Добавляем текст в тело документа
+    title.style.textShadow = '0 0 10px rgba(255,255,255,0.5)';
+    title.style.transition = 'all 0.3s ease';
+    document.body.appendChild(title);
 
-    // Функция для создания анимации переливающегося цвета
+    // Улучшенная функция для создания анимации переливающегося цвета
     function animateRGBText() {
-        let r = Math.floor(128 + 128 * Math.sin(Date.now() / 1000));  // Красный компонент
-        let g = Math.floor(128 + 128 * Math.sin(Date.now() / 1000 + 2));  // Зеленый компонент
-        let b = Math.floor(128 + 128 * Math.sin(Date.now() / 1000 + 4));  // Синий компонент
-
-        title.style.color = `rgb(${r},${g},${b})`; // Применяем цвет к тексту
-
-        requestAnimationFrame(animateRGBText); // Обновляем анимацию на каждый кадр
+        const time = Date.now() / 1000;
+        const r = Math.floor(128 + 128 * Math.sin(time));
+        const g = Math.floor(128 + 128 * Math.sin(time + 2));
+        const b = Math.floor(128 + 128 * Math.sin(time + 4));
+        
+        title.style.color = `rgb(${r},${g},${b})`;
+        title.style.transform = `scale(${1 + 0.1 * Math.sin(time)})`;
+        
+        requestAnimationFrame(animateRGBText);
     }
 
     // Запуск анимации цвета текста
@@ -106,7 +162,7 @@ var init = function () {
             q: ~~(rand() * heartPointsCount),
             D: 2 * (i % 2) - 1,
             force: 0.2 * rand() + 0.7,
-            f: `rgb(${Math.random()*255},${Math.random()*255},${Math.random()*255})`, // Переливающийся цвет частиц
+            f: `hsla(${Math.random() * 360}, 100%, 50%, 0.8)`,
             trace: []
         };
         for (var k = 0; k < traceCount; k++) e[i].trace[k] = {x: x, y: y};
@@ -120,16 +176,79 @@ var init = function () {
     var time = 0;
     var loop = function () {
         var n = -Math.cos(time);
-        pulse((1 + n) * .5, (1 + n) * .5);
+        
+        // Добавляем реакцию на мышь
+        var dx = mouseX - width / 2;
+        var dy = mouseY - height / 2;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        var mouseInfluence = Math.max(0, 1 - distance / mouseRadius);
+        
+        // Изменяем пульсацию в зависимости от позиции мыши
+        var mouseScale = 1 + mouseInfluence * 0.3;
+        pulse((1 + n) * .5 * mouseScale, (1 + n) * .5 * mouseScale);
+        
         time += ((Math.sin(time)) < 0 ? 9 : (n > 0.8) ? .2 : 1) * config.timeDelta;
         ctx.fillStyle = "rgba(0,0,0,.1)";
         ctx.fillRect(0, 0, width, height);
+        
+        // Обновляем и рисуем волны
+        for (var i = waves.length - 1; i >= 0; i--) {
+            var wave = waves[i];
+            wave.radius += wave.speed;
+            wave.life -= 0.01;
+            
+            if (wave.life <= 0 || wave.radius > wave.maxRadius) {
+                waves.splice(i, 1);
+                continue;
+            }
+            
+            ctx.beginPath();
+            ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = wave.color.replace('0.3', wave.life.toFixed(2));
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.closePath();
+        }
+        
+        // Добавляем свечение вокруг курсора
+        var gradient = ctx.createRadialGradient(mouseX, mouseY, 0, mouseX, mouseY, mouseRadius);
+        gradient.addColorStop(0, 'rgba(255,255,255,0.2)');
+        gradient.addColorStop(0.5, 'rgba(255,255,255,0.1)');
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+
         for (i = e.length; i--;) {
             var u = e[i];
             var q = targetPoints[u.q];
             var dx = u.trace[0].x - q[0];
             var dy = u.trace[0].y - q[1];
             var length = Math.sqrt(dx * dx + dy * dy);
+            
+            // Улучшенное отталкивание от курсора с учетом волн
+            var mouseDx = u.trace[0].x - mouseX;
+            var mouseDy = u.trace[0].y - mouseY;
+            var mouseDist = Math.sqrt(mouseDx * mouseDx + mouseDy * mouseDy);
+            
+            // Влияние волн на частицы
+            waves.forEach(function(wave) {
+                var waveDx = u.trace[0].x - wave.x;
+                var waveDy = u.trace[0].y - wave.y;
+                var waveDist = Math.sqrt(waveDx * waveDx + waveDy * waveDy);
+                
+                if (Math.abs(waveDist - wave.radius) < 20) {
+                    var waveForce = (1 - Math.abs(waveDist - wave.radius) / 20) * wave.life;
+                    u.vx += (waveDx / waveDist) * waveForce * u.speed * 0.2;
+                    u.vy += (waveDy / waveDist) * waveForce * u.speed * 0.2;
+                }
+            });
+            
+            if (mouseDist < mouseRadius) {
+                var force = (1 - mouseDist / mouseRadius) * 2;
+                u.vx += (mouseDx / mouseDist) * force * u.speed;
+                u.vy += (mouseDy / mouseDist) * force * u.speed;
+            }
+            
             if (10 > length) {
                 if (0.95 < rand()) {
                     u.q = ~~(rand() * heartPointsCount);
